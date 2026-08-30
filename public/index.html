@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FB Video Bot Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; }
+    header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 20px 30px; border-bottom: 2px solid #1877f2; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 22px; color: #fff; }
+    header span { font-size: 12px; color: #888; }
+    .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 20px; text-align: center; }
+    .stat-card .num { font-size: 36px; font-weight: bold; }
+    .stat-card .label { font-size: 12px; color: #888; margin-top: 4px; }
+    .num-blue { color: #1877f2; } .num-green { color: #4caf50; } .num-red { color: #f44336; }
+
+    /* Upload box */
+    .upload-box { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .upload-box h3 { margin-bottom: 12px; font-size: 14px; color: #aaa; }
+    .url-input { width: 100%; padding: 12px; background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 10px; }
+    .url-input:focus { outline: none; border-color: #1877f2; }
+    .upload-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #1877f2, #0d5dbf); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .upload-btn:hover { opacity: 0.9; } .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .status-bar { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #aaa; min-height: 44px; }
+    .status-bar.running { border-color: #ffc107; color: #ffc107; }
+    .status-bar.success { border-color: #4caf50; color: #4caf50; }
+    .status-bar.error { border-color: #f44336; color: #f44336; }
+
+    .section { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+    .section-header { padding: 14px 20px; background: #16213e; font-weight: bold; font-size: 14px; border-bottom: 1px solid #2a2a4a; }
+
+    .post-item { padding: 12px 20px; border-bottom: 1px solid #1e1e3a; font-size: 13px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .post-item:last-child { border-bottom: none; }
+    .post-title { font-weight: 600; flex: 1; }
+    .post-meta { font-size: 11px; color: #888; }
+    .delete-badge { background: #4a1a1a; color: #f44336; padding: 3px 8px; border-radius: 10px; font-size: 11px; }
+
+    .run-item { padding: 14px 20px; border-bottom: 1px solid #1e1e3a; cursor: pointer; }
+    .run-item:last-child { border-bottom: none; }
+    .run-item:hover { background: #1e1e3a; }
+    .run-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px; }
+    .run-time { font-size: 12px; color: #aaa; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+    .badge-green { background: #1a4a2e; color: #4caf50; }
+    .badge-red { background: #4a1a1a; color: #f44336; }
+    .badge-blue { background: #1a2a4a; color: #1877f2; }
+    .run-logs { display: none; margin-top: 10px; background: #0a0a14; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 11px; color: #aaa; line-height: 1.8; max-height: 250px; overflow-y: auto; white-space: pre-wrap; }
+    .run-logs.open { display: block; }
+    .log-ok { color: #4caf50; } .log-err { color: #f44336; } .log-warn { color: #ffc107; }
+    .empty { padding: 24px; text-align: center; color: #555; font-size: 13px; }
+
+    .refresh-btn { background: #1a1a2e; border: 1px solid #2a2a4a; color: #aaa; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 16px; }
+    .refresh-btn:hover { border-color: #1877f2; color: #1877f2; }
+
+    @media (max-width: 600px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>📹 FB Video Bot</h1>
+  <span id="last-refresh">Loading...</span>
+</header>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="num num-blue" id="total-uploaded">—</div>
+      <div class="label">Total Uploaded</div>
+    </div>
+    <div class="stat-card">
+      <div class="num num-green" id="active-posts">—</div>
+      <div class="label">Active Posts</div>
+    </div>
+    <div class="stat-card">
+      <div class="num num-red" id="total-deleted">—</div>
+      <div class="label">Auto Deleted</div>
+    </div>
+  </div>
+
+  <!-- Upload Box -->
+  <div class="upload-box">
+    <h3>📥 Upload YouTube Video to Facebook</h3>
+    <input type="text" class="url-input" id="yt-url" placeholder="Paste YouTube URL here... https://youtube.com/watch?v=..." />
+    <button class="upload-btn" id="upload-btn" onclick="uploadVideo()">▶ Upload to Facebook</button>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar" id="status-bar">Idle — paste a YouTube URL and click Upload</div>
+
+  <!-- Refresh -->
+  <button class="refresh-btn" onclick="loadDashboard()">⟳ Refresh Dashboard</button>
+
+  <!-- Active Posts -->
+  <div class="section">
+    <div class="section-header">📋 Active Facebook Posts (pending deletion)</div>
+    <div id="posts-list"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- Run History -->
+  <div class="section">
+    <div class="section-header">📊 Recent Activity (click to expand logs)</div>
+    <div id="runs-list"><div class="empty">Loading...</div></div>
+  </div>
+
+</div>
+
+<script>
+const BASE = window.location.origin;
+
+function formatTime(iso) {
+  return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Dhaka", hour12: true });
+}
+
+function colorLog(line) {
+  if (line.includes("✅")) return `<span class="log-ok">${line}</span>`;
+  if (line.includes("❌") || line.includes("Error") || line.includes("error")) return `<span class="log-err">${line}</span>`;
+  if (line.includes("⚠️") || line.includes("warn")) return `<span class="log-warn">${line}</span>`;
+  return line;
+}
+
+function toggleLogs(id) {
+  document.getElementById("logs-" + id).classList.toggle("open");
+}
+
+async function loadDashboard() {
+  document.getElementById("last-refresh").textContent = "Refreshing...";
+  try {
+    const [logsRes, postsRes] = await Promise.all([
+      fetch(`${BASE}/api/logs`).then(r => r.json()),
+      fetch(`${BASE}/api/posts`).then(r => r.json()),
+    ]);
+
+    const runs = logsRes.runs || [];
+    const posts = postsRes.posts || [];
+
+    // Stats
+    const uploads = runs.filter(r => r.type === "upload" && r.status === "success").length;
+    const deletes = runs.filter(r => r.type === "delete").reduce((a, r) => a + (r.deleted || 0), 0);
+    document.getElementById("total-uploaded").textContent = uploads;
+    document.getElementById("active-posts").textContent = posts.length;
+    document.getElementById("total-deleted").textContent = deletes;
+
+    // Active posts
+    const postsList = document.getElementById("posts-list");
+    if (!posts.length) {
+      postsList.innerHTML = `<div class="empty">No active posts — all videos have been deleted or none uploaded yet</div>`;
+    } else {
+      postsList.innerHTML = posts.map(p => {
+        const delTime = formatTime(p.deleteAt);
+        return `<div class="post-item">
+          <div>
+            <div class="post-title">${p.title}</div>
+            <div class="post-meta">Uploaded: ${formatTime(p.uploadedAt)} | ID: ${p.fbPostId}</div>
+          </div>
+          <span class="delete-badge">🗑️ Deletes: ${delTime}</span>
+        </div>`;
+      }).join("");
+    }
+
+    // Run history
+    const runsList = document.getElementById("runs-list");
+    if (!runs.length) {
+      runsList.innerHTML = `<div class="empty">No activity yet</div>`;
+    } else {
+      runsList.innerHTML = runs.map((run, i) => {
+        const isUpload = run.type === "upload";
+        const badge = isUpload
+          ? (run.status === "success" ? `<span class="badge badge-green">✅ Uploaded</span>` : `<span class="badge badge-red">❌ Failed</span>`)
+          : `<span class="badge badge-blue">🗑️ Delete Check (${run.deleted || 0} deleted)</span>`;
+        const logHtml = (run.logs || []).map(colorLog).join("\n");
+        const title = run.title ? `— ${run.title}` : (run.ytUrl ? `— ${run.ytUrl.slice(0, 40)}...` : "");
+        return `<div class="run-item" onclick="toggleLogs(${i})">
+          <div class="run-header">
+            <span class="run-time">🕐 ${formatTime(run.timestamp)} ${title}</span>
+            ${badge}
+          </div>
+          <div id="logs-${i}" class="run-logs">${logHtml}</div>
+        </div>`;
+      }).join("");
+    }
+
+    document.getElementById("last-refresh").textContent = `Last refresh: ${new Date().toLocaleTimeString()}`;
+  } catch (err) {
+    document.getElementById("last-refresh").textContent = "Refresh failed";
+  }
+}
+
+async function uploadVideo() {
+  const urlInput = document.getElementById("yt-url");
+  const btn = document.getElementById("upload-btn");
+  const statusBar = document.getElementById("status-bar");
+  const url = urlInput.value.trim();
+
+  if (!url || (!url.includes("youtube.com") && !url.includes("youtu.be"))) {
+    statusBar.className = "status-bar error";
+    statusBar.textContent = "❌ Please enter a valid YouTube URL";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "⏳ Processing...";
+  statusBar.className = "status-bar running";
+  statusBar.textContent = "🔄 Downloading and uploading... this may take 2-5 minutes. Check Telegram for updates!";
+
+  try {
+    const res = await fetch(`${BASE}/api/upload`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      statusBar.className = "status-bar success";
+      statusBar.textContent = "✅ Processing started! You'll get a Telegram notification when done.";
+      urlInput.value = "";
+      // Refresh after 3 minutes
+      setTimeout(loadDashboard, 3 * 60 * 1000);
+    } else {
+      statusBar.className = "status-bar error";
+      statusBar.textContent = `❌ Error: ${data.error}`;
+    }
+  } catch (err) {
+    statusBar.className = "status-bar error";
+    statusBar.textContent = `❌ Request failed: ${err.message}`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = "▶ Upload to Facebook";
+}
+
+// Enter key triggers upload
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("yt-url").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") uploadVideo();
+  });
+  loadDashboard();
+  setInterval(loadDashboard, 5 * 60 * 1000);
+});
+</script>
+</body>
+</html>
